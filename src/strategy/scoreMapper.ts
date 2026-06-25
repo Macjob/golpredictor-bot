@@ -140,6 +140,7 @@ function normalizeText(value: string): string {
     "arabia saudita": "saudi arabia",
     "cabo verde": "cape verde",
     "rd congo": "dr congo",
+    "sudafrica": "south africa",
     "uzbekistan": "uzbekistan",
   };
 
