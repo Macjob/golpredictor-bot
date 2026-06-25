@@ -18,7 +18,7 @@ const envSchema = z.object({
   GOLPREDICTOR_POOL_ID: z.string().optional(),
   GOLPREDICTOR_USERNAME: z.string().optional(),
   GOLPREDICTOR_PASSWORD: z.string().optional(),
-  RUN_WINDOW_MAX_MINUTES_BEFORE: z.coerce.number().default(20),
+  RUN_WINDOW_MAX_MINUTES_BEFORE: z.coerce.number().default(60),
   RUN_WINDOW_MIN_MINUTES_BEFORE: z.coerce.number().default(12),
   TIMEZONE: z.string().default("America/Santiago"),
   POLYMARKET_GAMMA_BASE_URL: z
