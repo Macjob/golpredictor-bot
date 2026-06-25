@@ -16,12 +16,11 @@ export async function searchMarkets(
   const baseUrl = config.POLYMARKET_GAMMA_BASE_URL;
 
   const results: MarketAnalysis[] = [];
+  const searchQueries = buildSearchQueries(homeTeam, awayTeam);
 
-  const searchQueries = [
-    `${homeTeam} vs ${awayTeam}`,
-    `${awayTeam} vs ${homeTeam}`,
-    `${homeTeam} ${awayTeam}`,
-  ];
+  logger.debug(
+    `Queries Polymarket para ${homeTeam} vs ${awayTeam}: ${searchQueries.join(" | ")}`
+  );
 
   for (const query of searchQueries) {
     try {
@@ -68,27 +67,44 @@ async function searchByQuery(
   return data.events || [];
 }
 
+function buildSearchQueries(homeTeam: string, awayTeam: string): string[] {
+  const homeAliases = getTeamAliases(homeTeam).slice(0, 4);
+  const awayAliases = getTeamAliases(awayTeam).slice(0, 4);
+  const queries = new Set<string>();
+
+  for (const home of homeAliases) {
+    for (const away of awayAliases) {
+      queries.add(`${home} vs ${away}`);
+      queries.add(`${away} vs ${home}`);
+      queries.add(`${home} ${away}`);
+    }
+  }
+
+  return [...queries].slice(0, 18);
+}
+
 function filterByTeamsAndDate(
   events: PolymarketEvent[],
   homeTeam: string,
   awayTeam: string,
   matchDate: Date
 ): PolymarketEvent[] {
-  const homeNorm = normalizeTeam(homeTeam);
-  const awayNorm = normalizeTeam(awayTeam);
+  const homeAliases = getTeamAliases(homeTeam).map(normalizeText);
+  const awayAliases = getTeamAliases(awayTeam).map(normalizeText);
 
   logger.debug(`Buscando eventos para ${homeTeam} vs ${awayTeam}`);
-  logger.debug(`Normalizado: ${homeNorm} vs ${awayNorm}`);
+  logger.debug(`Aliases home: ${homeAliases.join(", ")}`);
+  logger.debug(`Aliases away: ${awayAliases.join(", ")}`);
 
   return events.filter((event) => {
-    const title = normalizeTeam(event.title);
+    const title = normalizeText(event.title);
     logger.debug(`Evento: ${event.title} → ${title}`);
-    
-    const hasHome = title.includes(homeNorm);
-    const hasAway = title.includes(awayNorm);
-    
-    const hasHomeReverse = title.includes(awayNorm);
-    const hasAwayReverse = title.includes(homeNorm);
+
+    const hasHome = homeAliases.some((alias) => title.includes(alias));
+    const hasAway = awayAliases.some((alias) => title.includes(alias));
+
+    const hasHomeReverse = awayAliases.some((alias) => title.includes(alias));
+    const hasAwayReverse = homeAliases.some((alias) => title.includes(alias));
 
     if ((!hasHome || !hasAway) && (!hasHomeReverse || !hasAwayReverse)) {
       logger.debug(`  Rechazado: no contiene ambos equipos`);
@@ -100,56 +116,97 @@ function filterByTeamsAndDate(
   });
 }
 
-function normalizeTeam(name: string): string {
-  const teamMap: Record<string, string> = {
-    "curazao": "curacao",
-    "costa de marfil": "cote divoire",
-    "paises bajos": "netherlands",
-    "estados unidos": "usa",
-    "alemania": "germany",
-    "japon": "japan",
-    "suecia": "sweden",
-    "tunez": "tunisia",
-    "turquia": "turkey",
-    "brasil": "brazil",
-    "argentina": "argentina",
-    "espana": "spain",
-    "francia": "france",
-    "inglaterra": "england",
-    "portugal": "portugal",
-    "colombia": "colombia",
-    "mexico": "mexico",
-    "uruguay": "uruguay",
-    "ecuador": "ecuador",
-    "senegal": "senegal",
-    "irak": "iraq",
-    "irán": "iran",
-    "croacia": "croatia",
-    "ghana": "ghana",
-    "australia": "australia",
-    "paraguay": "paraguay",
-    "noruega": "norway",
-    "belgica": "belgium",
-    "nueva zelanda": "new zealand",
-    "panama": "panama",
-    "egipto": "egypt",
-    "argelia": "algeria",
-    "austria": "austria",
-    "jordania": "jordan",
-    "arabia saudita": "saudi arabia",
-    "cabo verde": "cape verde",
-    "rd congo": "dr congo",
-    "uzbekistan": "uzbekistan",
-  };
-
-  const normalized = name
+function normalizeText(name: string): string {
+  return name
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
+}
 
-  return teamMap[normalized] || normalized;
+function unique(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const normalized = normalizeText(value);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+
+  return result;
+}
+
+function getTeamAliases(name: string): string[] {
+  const normalized = normalizeText(name);
+
+  const aliasMap: Record<string, string[]> = {
+    "curazao": ["curacao", "curaçao"],
+    "curacao": ["curazao", "curaçao"],
+    "costa de marfil": ["ivory coast", "cote divoire", "cote d ivoire"],
+    "ivory coast": ["costa de marfil", "cote divoire", "cote d ivoire"],
+    "cote divoire": ["ivory coast", "costa de marfil", "cote d ivoire"],
+    "paises bajos": ["netherlands", "holland"],
+    "netherlands": ["paises bajos", "holland"],
+    "estados unidos": ["united states", "usa", "usmnt"],
+    "united states": ["estados unidos", "usa", "usmnt"],
+    "usa": ["united states", "estados unidos", "usmnt"],
+    "alemania": ["germany"],
+    "germany": ["alemania"],
+    "japon": ["japan"],
+    "japan": ["japon"],
+    "suecia": ["sweden"],
+    "sweden": ["suecia"],
+    "tunez": ["tunisia"],
+    "tunisia": ["tunez"],
+    "turquia": ["turkey"],
+    "turkey": ["turquia"],
+    "brasil": ["brazil"],
+    "brazil": ["brasil"],
+    "espana": ["spain"],
+    "spain": ["espana"],
+    "francia": ["france"],
+    "france": ["francia"],
+    "inglaterra": ["england"],
+    "england": ["inglaterra"],
+    "irak": ["iraq"],
+    "iraq": ["irak"],
+    "iran": ["ir irán", "ir iran", "irán"],
+    "ir irán": ["iran", "ir iran"],
+    "ir iran": ["iran", "ir irán"],
+    "croacia": ["croatia"],
+    "croatia": ["croacia"],
+    "noruega": ["norway"],
+    "norway": ["noruega"],
+    "belgica": ["belgium"],
+    "belgium": ["belgica"],
+    "nueva zelanda": ["new zealand"],
+    "new zealand": ["nueva zelanda"],
+    "egipto": ["egypt"],
+    "egypt": ["egipto"],
+    "argelia": ["algeria"],
+    "algeria": ["argelia"],
+    "jordania": ["jordan"],
+    "jordan": ["jordania"],
+    "arabia saudita": ["saudi arabia"],
+    "saudi arabia": ["arabia saudita"],
+    "cabo verde": ["cape verde"],
+    "cape verde": ["cabo verde"],
+    "rd congo": ["dr congo", "congo dr", "democratic republic of congo"],
+    "dr congo": ["rd congo", "congo dr", "democratic republic of congo"],
+  };
+
+  return unique([
+    ...(aliasMap[normalized] || []),
+    normalized,
+  ]);
+}
+
+function normalizeTeam(name: string): string {
+  return getTeamAliases(name)[0] || normalizeText(name);
 }
 
 function isRelevantMarket(market: PolymarketMarket): boolean {
