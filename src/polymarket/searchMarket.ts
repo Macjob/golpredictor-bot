@@ -98,7 +98,24 @@ function filterByTeamsAndDate(
 
   return events.filter((event) => {
     const title = normalizeText(event.title);
-    logger.debug(`Evento: ${event.title} → ${title}`);
+    const slug = normalizeText(event.slug || "");
+    const desc = normalizeText(event.description || "");
+
+    const isCricket = title.includes("t20") || title.includes("cricket") ||
+      slug.includes("t20") || slug.includes("cricket");
+    if (isCricket) {
+      logger.debug(`  Rechazado: es cricket (${event.title})`);
+      return false;
+    }
+
+    const isFifaWorldCup = slug.startsWith("fifwc") || slug.includes("fifwc") ||
+      desc.includes("fifa world cup") || desc.includes("fifa tournament");
+    const hasTeamInTitle = homeAliases.some((a) => title.includes(a)) ||
+      awayAliases.some((a) => title.includes(a));
+    if (!isFifaWorldCup && !hasTeamInTitle) {
+      logger.debug(`  Rechazado: no es evento FIFA (${event.title})`);
+      return false;
+    }
 
     const hasHome = homeAliases.some((alias) => title.includes(alias));
     const hasAway = awayAliases.some((alias) => title.includes(alias));
