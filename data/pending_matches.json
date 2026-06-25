@@ -1,0 +1,32 @@
+[
+  {
+    "homeTeam": "Curazao",
+    "awayTeam": "Costa de Marfil",
+    "kickoffLocal": "25 Jun - 17:00",
+    "minutesUntilKickoff": 822
+  },
+  {
+    "homeTeam": "Ecuador",
+    "awayTeam": "Alemania",
+    "kickoffLocal": "25 Jun - 17:00",
+    "minutesUntilKickoff": 822
+  },
+  {
+    "homeTeam": "Japón",
+    "awayTeam": "Suecia",
+    "kickoffLocal": "25 Jun - 20:00",
+    "minutesUntilKickoff": 1002
+  },
+  {
+    "homeTeam": "Túnez",
+    "awayTeam": "Países Bajos",
+    "kickoffLocal": "25 Jun - 20:00",
+    "minutesUntilKickoff": 1002
+  },
+  {
+    "homeTeam": "Turquía",
+    "awayTeam": "Estados Unidos",
+    "kickoffLocal": "25 Jun - 23:00",
+    "minutesUntilKickoff": 1182
+  }
+]
