@@ -128,18 +128,14 @@ async function runPredict(): Promise<void> {
       );
 
       if (markets.length === 0) {
-        logger.info("  No se encontraron mercados en Polymarket → usando heurística por defecto");
-        const rawScore = deriveScoreFromMarketSignals(
-          markets,
-          fixture.homeTeam,
-          fixture.awayTeam
-        );
-        const guardedScore = applyScoreSanityGuard(rawScore, {
-          hasGoalSignals: false,
-          hasBothTeamsScoreSignal: false,
-          hasExactScoreMarket: false,
+        logger.info("  No se encontraron mercados en Polymarket → manual_review");
+        results.push({
+          fixture,
+          prediction: null,
+          market: null,
+          status: "no_market",
         });
-        score = adjustPredictionForFixtureContext(fixture, guardedScore);
+        continue;
       } else {
         const exactScore = findBestExactScorePrediction(
           markets,
@@ -162,12 +158,12 @@ async function runPredict(): Promise<void> {
             fixture.homeTeam,
             fixture.awayTeam
           );
-          const guardedScore = applyScoreSanityGuard(rawScore, {
+          const contextAdjustedScore = adjustPredictionForFixtureContext(fixture, rawScore);
+          score = applyScoreSanityGuard(contextAdjustedScore, {
             hasGoalSignals,
             hasBothTeamsScoreSignal: hasBtsSignal,
             hasExactScoreMarket: false,
           });
-          score = adjustPredictionForFixtureContext(fixture, guardedScore);
           const best1x2 = selectBestPrediction(markets);
           usedMarket = best1x2;
           logger.info(

@@ -27,45 +27,7 @@ export function applyScoreSanityGuard(
   let reason: string | null = null;
 
   if (!context.hasGoalSignals && !context.hasBothTeamsScoreSignal) {
-    if (totalGoals > 4) {
-      if (homeWins) {
-        newHome = Math.min(homeScore, 3);
-        newAway = Math.min(awayScore, 1);
-        if (newHome + newAway > 4) {
-          newHome = 2;
-          newAway = 1;
-        }
-      } else if (awayWins) {
-        newHome = Math.min(homeScore, 1);
-        newAway = Math.min(awayScore, 3);
-        if (newHome + newAway > 4) {
-          newHome = 1;
-          newAway = 2;
-        }
-      } else {
-        newHome = 2;
-        newAway = 2;
-      }
-      reason = `total goles ${totalGoals} alto sin señales de over/bts; limitado a ${newHome}-${newAway}`;
-    } else if (margin >= 3) {
-      if (homeWins) {
-        newHome = Math.max(2, homeScore - 1);
-        newAway = 0;
-      } else {
-        newAway = Math.max(2, awayScore - 1);
-        newHome = 0;
-      }
-      reason = `margen ${margin} alto sin señales de goles; reducido a ${newHome}-${newAway}`;
-    } else if (totalGoals === 5 && (homeWins || awayWins)) {
-      if (homeWins) {
-        newHome = 2;
-        newAway = 1;
-      } else {
-        newHome = 1;
-        newAway = 2;
-      }
-      reason = `5 goles sin señales; reducido a ${newHome}-${newAway}`;
-    } else if ((homeScore === 2 && awayScore === 3) || (homeScore === 3 && awayScore === 2)) {
+    if ((homeScore === 2 && awayScore === 3) || (homeScore === 3 && awayScore === 2)) {
       if (homeWins) {
         newHome = 2;
         newAway = 1;
@@ -83,6 +45,27 @@ export function applyScoreSanityGuard(
         newAway = 2;
       }
       reason = `3-0/0-3 sin señales; reducido a ${newHome}-${newAway}`;
+    } else if (totalGoals > 4) {
+      if (homeWins) {
+        newHome = 2;
+        newAway = 1;
+      } else if (awayWins) {
+        newHome = 1;
+        newAway = 2;
+      } else {
+        newHome = 1;
+        newAway = 1;
+      }
+      reason = `total goles ${totalGoals} alto sin señales de over/bts; limitado a ${newHome}-${newAway}`;
+    } else if (margin >= 3) {
+      if (homeWins) {
+        newHome = 2;
+        newAway = 0;
+      } else {
+        newAway = 2;
+        newHome = 0;
+      }
+      reason = `margen ${margin} alto sin señales de goles; reducido a ${newHome}-${newAway}`;
     }
   }
 
@@ -109,11 +92,16 @@ export function applyScoreSanityGuard(
     `score_sanity_guard_used=true | original_score=${homeScore}-${awayScore} | adjusted_score=${newHome}-${newAway} | reason=${reason}`
   );
 
+  const adjustedConfidence = Math.max(0, prediction.confidence * 0.9);
+
   return {
     ...prediction,
     homeScore: newHome,
     awayScore: newAway,
-    confidence: Math.max(0.15, prediction.confidence * 0.9),
+    confidence: adjustedConfidence,
+    scoreProbability: prediction.scoreProbability !== undefined
+      ? Math.max(0, prediction.scoreProbability * 0.9)
+      : prediction.scoreProbability,
     reasoning: `${prediction.reasoning}. Sanity guard: ${reason}`,
   };
 }
