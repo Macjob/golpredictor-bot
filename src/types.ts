@@ -16,6 +16,7 @@ export interface PolymarketEvent {
   id: string;
   slug: string;
   title: string;
+  description?: string;
   startDate: string;
   active: boolean;
   closed: boolean;
@@ -56,6 +57,13 @@ export interface ScorePrediction {
   confidence: number;
   source: "exact_score_market" | "1x2_derived" | "poisson_derived" | "fallback" | "fallback_heuristic";
   reasoning: string;
+  scoreProbability?: number;
+  modelFit?: number;
+  resultProbabilities?: {
+    homeWin: number;
+    draw: number;
+    awayWin: number;
+  };
 }
 
 export interface PredictionResult {

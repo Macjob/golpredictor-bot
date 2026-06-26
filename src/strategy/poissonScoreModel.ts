@@ -171,18 +171,26 @@ export function deriveMostLikelyScore(
     return heuristicFallback(signals);
   }
 
-  const confidence = Math.max(0.15, 1 - bestResult.error);
+  const scoreProb = bestResult.bestScoreProb;
+  const modelFit = Math.max(0, 1 - bestResult.error);
 
   logger.info(
-    `poisson_model_used=true | home_lambda=${bestResult.homeLambda.toFixed(2)} | away_lambda=${bestResult.awayLambda.toFixed(2)} | selected_score=${bestResult.bestScoreHome}-${bestResult.bestScoreAway} | selected_score_probability=${(bestResult.bestScoreProb * 100).toFixed(1)}% | market_signals_used=[${signalsUsed.join(", ")}] | error=${bestResult.error.toFixed(4)}`
+    `poisson_model_used=true | home_lambda=${bestResult.homeLambda.toFixed(2)} | away_lambda=${bestResult.awayLambda.toFixed(2)} | selected_score=${bestResult.bestScoreHome}-${bestResult.bestScoreAway} | score_probability=${(scoreProb * 100).toFixed(1)}% | model_fit=${(modelFit * 100).toFixed(1)}% | confidence=${(scoreProb * 100).toFixed(1)}% | market_signals_used=[${signalsUsed.join(", ")}] | error=${bestResult.error.toFixed(4)}`
   );
 
   return {
     homeScore: bestResult.bestScoreHome,
     awayScore: bestResult.bestScoreAway,
-    confidence,
+    confidence: scoreProb,
     source: "poisson_derived",
-    reasoning: `Modelo Poisson: λ_home=${bestResult.homeLambda.toFixed(2)}, λ_away=${bestResult.awayLambda.toFixed(2)} → ${bestResult.bestScoreHome}-${bestResult.bestScoreAway} (${(bestResult.bestScoreProb * 100).toFixed(1)}%). Señales: ${signalsUsed.join(", ")}. Predicciones Poisson: homeWin=${(bestResult.predictedHomeWin * 100).toFixed(1)}% draw=${(bestResult.predictedDraw * 100).toFixed(1)}% awayWin=${(bestResult.predictedAwayWin * 100).toFixed(1)}% over25=${(bestResult.predictedOver25 * 100).toFixed(1)}% bts=${(bestResult.predictedBts * 100).toFixed(1)}%`,
+    scoreProbability: scoreProb,
+    modelFit,
+    resultProbabilities: {
+      homeWin: bestResult.predictedHomeWin,
+      draw: bestResult.predictedDraw,
+      awayWin: bestResult.predictedAwayWin,
+    },
+    reasoning: `Modelo Poisson: λ_home=${bestResult.homeLambda.toFixed(2)}, λ_away=${bestResult.awayLambda.toFixed(2)} → ${bestResult.bestScoreHome}-${bestResult.bestScoreAway} (${(scoreProb * 100).toFixed(1)}%). Señales: ${signalsUsed.join(", ")}. Predicciones Poisson: homeWin=${(bestResult.predictedHomeWin * 100).toFixed(1)}% draw=${(bestResult.predictedDraw * 100).toFixed(1)}% awayWin=${(bestResult.predictedAwayWin * 100).toFixed(1)}% over25=${(bestResult.predictedOver25 * 100).toFixed(1)}% bts=${(bestResult.predictedBts * 100).toFixed(1)}%`,
   };
 }
 

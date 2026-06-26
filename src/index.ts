@@ -6,6 +6,8 @@ import { searchMarkets } from "./polymarket/searchMarket.js";
 import { selectBestPrediction } from "./polymarket/selectPrediction.js";
 import { findBestExactScorePrediction, deriveScoreFromMarketSignals } from "./strategy/scoreMapper.js";
 import { adjustPredictionForFixtureContext } from "./strategy/competitiveContext.js";
+import { applyScoreSanityGuard } from "./strategy/scoreSanityGuard.js";
+import { savePredictionHistory } from "./history/predictionHistory.js";
 import { submitPrediction } from "./golpredictor/submitPrediction.js";
 import type { PredictionResult, MarketAnalysis, ScorePrediction } from "./types.js";
 
@@ -115,6 +117,16 @@ async function runPredict(): Promise<void> {
       let score: ScorePrediction;
       let usedMarket: MarketAnalysis | null = null;
 
+      const hasGoalSignals = markets.some(
+        (m) => m.market.question.toLowerCase().includes("over") ||
+               m.market.question.toLowerCase().includes("under") ||
+               m.market.question.toLowerCase().includes("both teams")
+      );
+      const hasBtsSignal = markets.some(
+        (m) => m.market.question.toLowerCase().includes("both teams") &&
+               m.market.question.toLowerCase().includes("score")
+      );
+
       if (markets.length === 0) {
         logger.info("  No se encontraron mercados en Polymarket → usando heurística por defecto");
         const rawScore = deriveScoreFromMarketSignals(
@@ -122,7 +134,12 @@ async function runPredict(): Promise<void> {
           fixture.homeTeam,
           fixture.awayTeam
         );
-        score = adjustPredictionForFixtureContext(fixture, rawScore);
+        const guardedScore = applyScoreSanityGuard(rawScore, {
+          hasGoalSignals: false,
+          hasBothTeamsScoreSignal: false,
+          hasExactScoreMarket: false,
+        });
+        score = adjustPredictionForFixtureContext(fixture, guardedScore);
       } else {
         const exactScore = findBestExactScorePrediction(
           markets,
@@ -145,7 +162,12 @@ async function runPredict(): Promise<void> {
             fixture.homeTeam,
             fixture.awayTeam
           );
-          score = adjustPredictionForFixtureContext(fixture, rawScore);
+          const guardedScore = applyScoreSanityGuard(rawScore, {
+            hasGoalSignals,
+            hasBothTeamsScoreSignal: hasBtsSignal,
+            hasExactScoreMarket: false,
+          });
+          score = adjustPredictionForFixtureContext(fixture, guardedScore);
           const best1x2 = selectBestPrediction(markets);
           usedMarket = best1x2;
           logger.info(
@@ -156,6 +178,27 @@ async function runPredict(): Promise<void> {
 
       const result = await submitPrediction(session.context, fixture, score);
       results.push(result);
+
+      const historyStatus = result.status === "submitted" ? "submitted" :
+                            result.status === "dry_run" ? "dry_run" :
+                            result.status === "error" ? "error" : result.status;
+      savePredictionHistory(
+        fixture.matchId,
+        fixture.homeTeam,
+        fixture.awayTeam,
+        fixture.kickoffLocal,
+        {
+          homeScore: score.homeScore,
+          awayScore: score.awayScore,
+          source: score.source,
+          confidence: score.confidence,
+          scoreProbability: score.scoreProbability,
+          modelFit: score.modelFit,
+          reasoning: score.reasoning,
+        },
+        historyStatus,
+        usedMarket?.market.question
+      );
 
       logger.info(
         `  Resultado: ${result.status} | Mercado: ${usedMarket?.market.question || "N/A"} | Marcador: ${score.homeScore}-${score.awayScore} | Confianza: ${(score.confidence * 100).toFixed(1)}%`
