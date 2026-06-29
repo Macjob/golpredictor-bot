@@ -1,2 +1,0 @@
-Session   Automatización de pronósticos en GolPredictor
-  Continue  opencode -s ses_103b332e1ffer8ombHLmOWBTJP
