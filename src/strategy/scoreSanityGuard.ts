@@ -5,13 +5,15 @@ interface SanityGuardContext {
   hasGoalSignals: boolean;
   hasBothTeamsScoreSignal: boolean;
   hasExactScoreMarket: boolean;
+  under25Probability?: number;
+  drawProbability?: number;
 }
 
 export function applyScoreSanityGuard(
   prediction: ScorePrediction,
   context: SanityGuardContext
 ): ScorePrediction {
-  if (prediction.source === "exact_score_market") {
+  if (prediction.source === "exact_score_market" || prediction.source === "manual_override") {
     return prediction;
   }
 
@@ -26,7 +28,34 @@ export function applyScoreSanityGuard(
   let newAway = awayScore;
   let reason: string | null = null;
 
-  if (!context.hasGoalSignals && !context.hasBothTeamsScoreSignal) {
+  if (homeScore === 0 && awayScore === 0) {
+    const under25 = context.under25Probability ?? 0;
+    const draw = context.drawProbability ?? 0;
+    const strongUnder25 = under25 > 0.55;
+    const strongDraw = draw > 0.40;
+
+    if (!strongUnder25 || !strongDraw) {
+      const hw = prediction.resultProbabilities?.homeWin ?? 0.33;
+      const aw = prediction.resultProbabilities?.awayWin ?? 0.33;
+      const diff = Math.abs(hw - aw);
+
+      if (diff > 0.15 && hw > aw) {
+        newHome = 1;
+        newAway = 0;
+        reason = `0-0 sin señal under25 fuerte (${(under25 * 100).toFixed(0)}%) y local con ventaja; ajustado a 1-0`;
+      } else if (diff > 0.15 && aw > hw) {
+        newHome = 0;
+        newAway = 1;
+        reason = `0-0 sin señal under25 fuerte (${(under25 * 100).toFixed(0)}%) y visitante con ventaja; ajustado a 0-1`;
+      } else {
+        newHome = 1;
+        newAway = 1;
+        reason = `0-0 sin señales under25/draw fuertes; ajustado a 1-1`;
+      }
+    }
+  }
+
+  if (!reason && !context.hasGoalSignals && !context.hasBothTeamsScoreSignal) {
     if ((homeScore === 2 && awayScore === 3) || (homeScore === 3 && awayScore === 2)) {
       if (homeWins) {
         newHome = 2;

@@ -55,7 +55,7 @@ export interface ScorePrediction {
   homeScore: number;
   awayScore: number;
   confidence: number;
-  source: "exact_score_market" | "1x2_derived" | "poisson_derived" | "fallback" | "fallback_heuristic";
+  source: "exact_score_market" | "1x2_derived" | "poisson_derived" | "fallback" | "fallback_heuristic" | "manual_override";
   reasoning: string;
   scoreProbability?: number;
   modelFit?: number;

@@ -7,6 +7,7 @@ import { selectBestPrediction } from "./polymarket/selectPrediction.js";
 import { findBestExactScorePrediction, deriveScoreFromMarketSignals } from "./strategy/scoreMapper.js";
 import { adjustPredictionForFixtureContext } from "./strategy/competitiveContext.js";
 import { applyScoreSanityGuard } from "./strategy/scoreSanityGuard.js";
+import { getManualOverride } from "./strategy/manualOverride.js";
 import { savePredictionHistory } from "./history/predictionHistory.js";
 import { submitPrediction } from "./golpredictor/submitPrediction.js";
 import type { PredictionResult, MarketAnalysis, ScorePrediction } from "./types.js";
@@ -108,6 +109,38 @@ async function runPredict(): Promise<void> {
       const minutesLeft = getMinutesUntilKickoff(fixture);
       logger.info(`  Minutos para kickoff: ${minutesLeft.toFixed(0)}`);
 
+      const manualOverride = getManualOverride(fixture.homeTeam, fixture.awayTeam);
+      if (manualOverride) {
+        logger.info(
+          `  Fuente: manual_override | Marcador: ${manualOverride.homeScore}-${manualOverride.awayScore} | Confianza: ${(manualOverride.confidence * 100).toFixed(1)}%`
+        );
+
+        const result = await submitPrediction(session.context, fixture, manualOverride);
+        results.push(result);
+        savePredictionHistory(
+          fixture.matchId,
+          fixture.homeTeam,
+          fixture.awayTeam,
+          fixture.kickoffLocal,
+          {
+            homeScore: manualOverride.homeScore,
+            awayScore: manualOverride.awayScore,
+            source: manualOverride.source,
+            confidence: manualOverride.confidence,
+            scoreProbability: manualOverride.scoreProbability,
+            modelFit: manualOverride.modelFit,
+            reasoning: manualOverride.reasoning,
+          },
+          result.status === "submitted" ? "submitted" :
+          result.status === "dry_run" ? "dry_run" : "error",
+          undefined
+        );
+        logger.info(
+          `  Resultado: ${result.status} | Mercado: N/A (override) | Marcador: ${manualOverride.homeScore}-${manualOverride.awayScore} | Confianza: ${(manualOverride.confidence * 100).toFixed(1)}%`
+        );
+        continue;
+      }
+
       const markets = await searchMarkets(
         fixture.homeTeam,
         fixture.awayTeam,
@@ -126,6 +159,22 @@ async function runPredict(): Promise<void> {
         (m) => m.market.question.toLowerCase().includes("both teams") &&
                m.market.question.toLowerCase().includes("score")
       );
+
+      const under25Market = markets.find(
+        (m) => m.market.question.toLowerCase().includes("under") &&
+               m.market.question.toLowerCase().includes("2.5")
+      );
+      const under25Prob = under25Market
+        ? under25Market.outcomes.find((o) => o.label.toLowerCase() === "yes")?.probability
+        : undefined;
+
+      const drawMarket = markets.find(
+        (m) => m.market.question.toLowerCase().includes("draw") ||
+               m.market.question.toLowerCase().includes("empate")
+      );
+      const drawProb = drawMarket
+        ? drawMarket.outcomes.find((o) => o.label.toLowerCase() === "yes")?.probability
+        : undefined;
 
       if (markets.length === 0) {
         logger.info("  No se encontraron mercados en Polymarket → usando heurística por defecto");
@@ -170,6 +219,8 @@ async function runPredict(): Promise<void> {
             hasGoalSignals,
             hasBothTeamsScoreSignal: hasBtsSignal,
             hasExactScoreMarket: false,
+            under25Probability: under25Prob,
+            drawProbability: drawProb,
           });
           const best1x2 = selectBestPrediction(markets);
           usedMarket = best1x2;
